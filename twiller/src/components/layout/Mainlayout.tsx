@@ -9,6 +9,7 @@ import ProfilePage from "../ProfilePage";
 const Mainlayout = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading } = useAuth();
   const [currentPage, setCurrentPage] = useState("home");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -27,11 +28,12 @@ const Mainlayout = ({ children }: { children: React.ReactNode }) => {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white flex justify-center">
-      <div className="w-20 sm:w-24 md:w-64 border-r border-gray-800">
-        <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} />
-      </div>
-      <main className="flex-1 max-w-2xl border-x border-gray-800">
+    <div className="min-h-screen bg-black text-white flex w-full overflow-x-hidden">
+      <Sidebar
+  currentPage={currentPage}
+  onNavigate={setCurrentPage}
+/>
+      <main className="flex-1 w-full max-w-full md:max-w-2xl border-x border-gray-800 overflow-x-hidden">
         {currentPage ==="profile" ? <ProfilePage/> :children}
       </main>
       <div className="hidden lg:block w-80 p-4">

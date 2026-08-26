@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react";
+import { Menu } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "./ui/tabs";
 import { Card, CardContent } from "./ui/card";
 import LoadingSpinner from "./loading-spinner";
 import TweetCard from "./TweetCard";
 import TweetComposer from "./TweetComposer";
 import axiosInstance from "@/lib/axiosInstance";
+import { useTranslation } from "react-i18next";
 
 interface Tweet {
   id: string;
@@ -86,6 +88,7 @@ const tweets: Tweet[] = [
   },
 ];
 const Feed = () => {
+  const { t } = useTranslation();
   const [tweets, setTweets] = useState<any>([]);
   const [loading, setloading] = useState(false);
   const fetchTweets = async () => {
@@ -106,11 +109,18 @@ const Feed = () => {
     setTweets((prev: any) => [newtweet, ...prev]);
   };
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen w-full overflow-x-hidden">
       <div className="sticky top-0 bg-black/90 backdrop-blur-md border-b border-gray-800 z-10">
-        <div className="px-4 py-3">
-          <h1 className="text-xl font-bold text-white">Home</h1>
-        </div>
+        <div className="px-4 py-3 flex items-center gap-3">
+  <button className="md:hidden text-white">
+  <Menu size={24} />
+</button>
+
+  <h1 className="text-xl font-bold text-white">
+  {t("home")}
+</h1>
+</div>
+        
 
         <Tabs defaultValue="foryou" className="w-full">
           <TabsList className="grid w-full grid-cols-2 bg-transparent border-b border-gray-800 rounded-none h-auto">
@@ -118,13 +128,13 @@ const Feed = () => {
               value="foryou"
               className="data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-1 data-[state=active]:border-blue-100 data-[state=active]:rounded-none text-gray-400 hover:bg-gray-900/50 py-4 font-semibold"
             >
-              For you
+              {t("forYou")}
             </TabsTrigger>
             <TabsTrigger
               value="following"
               className="data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-1 data-[state=active]:border-blue-100 data-[state=active]:rounded-none text-gray-400 hover:bg-gray-900/50 py-4 font-semibold"
             >
-              Following
+              {t("following")}
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -136,7 +146,7 @@ const Feed = () => {
             <CardContent className="py-12 text-center">
               <div className="text-gray-400 mb-4">
                 <LoadingSpinner size="lg" className="mx-auto mb-4" />
-                <p>Loading tweets...</p>
+                <p>{t("loadingTweets")}</p>
               </div>
             </CardContent>
           </Card>

@@ -1,11 +1,15 @@
 "use client";
 
 import { Search } from 'lucide-react';
-import React from 'react';
+import React, { useState } from 'react';
+
+import { useTranslation } from "react-i18next";
+
 import { Input } from '../ui/input';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
+import SubscriptionPlans from "../SubscriptionPlans";
 
 
 
@@ -35,13 +39,17 @@ const suggestions = [
 ];
 
 export default function RightSidebar() {
+
+const { t } = useTranslation();
+
+  const [showPlans, setShowPlans] = useState(false);
   return (
     <div className="w-80 p-4 space-y-4">
       {/* Search */}
       <div className="relative">
         <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
         <Input
-          placeholder="Search"
+          placeholder={t("search")}
           className="pl-12 bg-gray-900 border-gray-800 text-white placeholder-gray-400 rounded-full py-3"
         />
       </div>
@@ -49,28 +57,49 @@ export default function RightSidebar() {
       {/* Subscribe to Premium */}
       <Card className="bg-gray-900 border-gray-800">
         <CardContent className="p-4">
-          <h3 className="text-white text-xl font-bold mb-2">Subscribe to Premium</h3>
+          <h3 className="text-white text-xl font-bold mb-2">{t("subscribePremium")}</h3>
           <p className="text-gray-400 text-sm mb-4">
-            Subscribe to unlock new features and if eligible, receive a share of revenue.
+            {t("premiumDescription")}
           </p>
-          <Button className="bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-full">
-            Subscribe
-          </Button>
+          <Button
+  onClick={() => setShowPlans(true)}
+  className="bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-full"
+>
+  {t("subscribe")}
+</Button>
         </CardContent>
       </Card>
+
+      {
+  showPlans && (
+    <div className="fixed inset-0 bg-black/80 z-50 overflow-auto">
+      <div className="max-w-5xl mx-auto mt-10 p-4">
+
+        <button
+          onClick={() => setShowPlans(false)}
+          className="text-white mb-4 px-4 py-2 bg-red-500 rounded"
+        >
+          {t("close")}
+        </button>
+
+        <SubscriptionPlans />
+      </div>
+    </div>
+  )
+}
 
      
 
       {/* Who to follow */}
       <Card className="bg-gray-900 border-gray-800">
         <CardContent className="p-4">
-          <h3 className="text-white text-xl font-bold mb-4">You might like</h3>
+          <h3 className="text-white text-xl font-bold mb-4">{t("youMightLike")}</h3>
           <div className="space-y-4">
             {suggestions.map((user) => (
               <div key={user.id} className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <Avatar className="h-10 w-10">
-                    <AvatarImage src={user.avatar} alt={user.displayName} />
+                    <AvatarImage src={user.avatar || undefined} alt={user.displayName} />
                     <AvatarFallback>{user.displayName[0]}</AvatarFallback>
                   </Avatar>
                   <div>
@@ -91,13 +120,13 @@ export default function RightSidebar() {
                   variant="outline"
                   className="bg-white text-black hover:bg-gray-200 font-semibold rounded-full px-4"
                 >
-                  Follow
+                  {t("follow")}
                 </Button>
               </div>
             ))}
           </div>
           <Button variant="ghost" className="text-blue-400 hover:text-blue-300 p-0 mt-4">
-            Show more
+            {t("showMore")}
           </Button>
         </CardContent>
       </Card>

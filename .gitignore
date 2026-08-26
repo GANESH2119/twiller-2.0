@@ -1,0 +1,22 @@
+# Environment / Secret files
+backend/.env
+twiller/.env
+.env
+.env.local
+
+# Dependencies
+node_modules/
+backend/node_modules/
+twiller/node_modules/
+
+# Build files
+.next/
+twiller/.next/
+dist/
+build/
+
+# Uploads
+backend/uploads/
+
+# Logs
+*.log

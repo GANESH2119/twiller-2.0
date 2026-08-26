@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 
 import {
   Home,
@@ -11,7 +11,9 @@ import {
   User,
   MoreHorizontal,
   Settings,
-  LogOut
+  LogOut,
+  Menu,
+  ArrowLeft
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -26,6 +28,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import TwitterLogo from '../Twitterlogo';
 import { useAuth } from '@/context/AuthContext';
 
+import { useTranslation } from "react-i18next";
+
 interface SidebarProps {
   currentPage?: string;
   onNavigate?: (page: string) => void;
@@ -34,21 +38,52 @@ interface SidebarProps {
 export default function Sidebar({ currentPage = 'home', onNavigate }: SidebarProps) {
   const { user, logout } = useAuth();
 
-  const navigation = [
-    { name: 'Home', icon: Home, current: currentPage === 'home', page: 'home' },
-    { name: 'Explore', icon: Search, current: currentPage === 'explore', page: 'explore' },
-    { name: 'Notifications', icon: Bell, current: currentPage === 'notifications', page: 'notifications', badge: true },
-    { name: 'Messages', icon: Mail, current: currentPage === 'messages', page: 'messages' },
-    { name: 'Bookmarks', icon: Bookmark, current: currentPage === 'bookmarks', page: 'bookmarks' },
-    { name: 'Profile', icon: User, current: currentPage === 'profile', page: 'profile' },
-    { name: 'More', icon: MoreHorizontal, current: currentPage === 'more', page: 'more' },
-  ];
+const { t } = useTranslation();
 
-  return (
-    <div className="flex flex-col h-screen w-64 border-r border-gray-800 bg-black">
-      <div className="p-4">
-        <TwitterLogo size="lg" className="text-white" />
-      </div>
+  const [isOpen, setIsOpen] = useState(false);
+
+  const navigation = [
+  { name: t('home'), icon: Home, current: currentPage === 'home', page: 'home' },
+  { name: t('explore'), icon: Search, current: currentPage === 'explore', page: 'explore' },
+  { name: t('notifications'), icon: Bell, current: currentPage === 'notifications', page: 'notifications', badge: true },
+  { name: t('messages'), icon: Mail, current: currentPage === 'messages', page: 'messages' },
+  { name: t('bookmarks'), icon: Bookmark, current: currentPage === 'bookmarks', page: 'bookmarks' },
+  { name: t('profile'), icon: User, current: currentPage === 'profile', page: 'profile' },
+  { name: t('more'), icon: MoreHorizontal, current: currentPage === 'more', page: 'more' },
+];
+
+  return ( 
+     <>
+  
+  {isOpen && (
+  <div
+    className="fixed inset-0 bg-black/50 z-40 md:hidden"
+    onClick={() => setIsOpen(false)}
+  />
+)}
+<div
+  className={`
+    fixed md:static top-0 left-0 z-50
+    flex flex-col h-screen w-64 border-r border-gray-800 bg-black
+    transition-transform duration-300
+    ${isOpen ? "translate-x-0" : "-translate-x-full"}
+    md:translate-x-0
+    md:flex
+  `}
+>
+    <div className="p-4 flex items-center justify-between">
+  <TwitterLogo size="lg" className="text-white" />
+
+  <button
+    className="md:hidden text-white"
+    onClick={() => setIsOpen(false)}
+  >
+    <ArrowLeft size={24} />
+  </button>
+</div>
+      
+        
+      
       
       <nav className="flex-1 px-2">
         <ul className="space-y-2">
@@ -59,7 +94,10 @@ export default function Sidebar({ currentPage = 'home', onNavigate }: SidebarPro
                 className={`w-full justify-start text-xl py-6 px-4 rounded-full hover:bg-gray-900 ${
                   item.current ? 'font-bold' : 'font-normal'
                 } text-white hover:text-white`}
-                onClick={() => onNavigate?.(item.page)}
+                onClick={() => {
+  onNavigate?.(item.page);
+  setIsOpen(false);
+}}
               >
                 <item.icon className="mr-4 h-7 w-7" />
                 {item.name}
@@ -75,7 +113,7 @@ export default function Sidebar({ currentPage = 'home', onNavigate }: SidebarPro
         
         <div className="mt-8 px-2">
           <Button className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-full text-lg">
-            Post
+            {t("post")}
           </Button>
         </div>
       </nav>
@@ -89,7 +127,7 @@ export default function Sidebar({ currentPage = 'home', onNavigate }: SidebarPro
                 className="w-full justify-start p-3 rounded-full hover:bg-gray-900"
               >
                 <Avatar className="h-10 w-10 mr-3">
-                  <AvatarImage src={user.avatar} alt={user.displayName} />
+                  <AvatarImage src={user.avatar || undefined} alt={user.displayName} />
                   <AvatarFallback>{user.displayName[0]}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 text-left">
@@ -102,7 +140,7 @@ export default function Sidebar({ currentPage = 'home', onNavigate }: SidebarPro
             <DropdownMenuContent className="w-56 bg-black border-gray-800">
               <DropdownMenuItem className="text-white hover:bg-gray-900">
                 <Settings className="mr-2 h-4 w-4" />
-                Settings
+                {t("settings")}
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-gray-800" />
               <DropdownMenuItem 
@@ -110,12 +148,13 @@ export default function Sidebar({ currentPage = 'home', onNavigate }: SidebarPro
                 onClick={logout}
               >
                 <LogOut className="mr-2 h-4 w-4" />
-                Log out @{user.username}
+                {t("logout")} @{user.username}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       )}
     </div>
+    </>
   );
 }

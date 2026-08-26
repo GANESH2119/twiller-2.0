@@ -49,24 +49,29 @@ export default function TweetCard({ tweet }: any) {
   };
   const isLiked = tweetstate.likedBy?.includes(user?._id);
   const isRetweet = tweetstate.retweetedBy?.includes(user?._id);
+
+  if (!tweetstate.author) return null;
+  
   return (
     <Card className="bg-black border-gray-800 border-x-0 border-t-0 rounded-none hover:bg-gray-950/50 transition-colors cursor-pointer">
       <CardContent className="p-4">
         <div className="flex space-x-3">
           <Avatar className="h-12 w-12">
             <AvatarImage
-              src={tweetstate.author.avatar}
-              alt={tweetstate.author.displayName}
+              src={tweet.author.avatar || undefined} 
+              alt={tweetstate.author?.displayName || "User"}
             />
-            <AvatarFallback>{tweetstate.author.displayName}</AvatarFallback>
+            <AvatarFallback>
+  {tweetstate.author?.displayName || "U"}
+</AvatarFallback>
           </Avatar>
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center space-x-2 mb-2">
               <span className="font-bold text-white">
-                {tweetstate.author.displayName}
+                {tweetstate.author?.displayName || "Unknown User"}
               </span>
-              {tweetstate.author.verified && (
+              {tweetstate.author?.verified && (
                 <div className="bg-blue-500 rounded-full p-0.5">
                   <svg
                     className="h-4 w-4 text-white fill-current"
@@ -77,7 +82,7 @@ export default function TweetCard({ tweet }: any) {
                 </div>
               )}
               <span className="text-gray-500">
-                @{tweetstate.author.username}
+                @{tweetstate.author?.username}
               </span>
               <span className="text-gray-500">·</span>
               <span className="text-gray-500">
@@ -107,10 +112,18 @@ export default function TweetCard({ tweet }: any) {
                 <img
                   src={tweetstate.image}
                   alt="Tweet image"
-                  className="w-full h-auto max-h-96 object-cover"
+                  className="w-full h-auto max-h-96 object-contain"
                 />
               </div>
             )}
+            {tweetstate.audio && (
+  <div className="mb-3">
+    <audio controls className="w-full">
+      <source src={tweetstate.audio} />
+      Your browser does not support audio.
+    </audio>
+  </div>
+)}
 
             <div className="flex items-center justify-between max-w-md">
               <Button

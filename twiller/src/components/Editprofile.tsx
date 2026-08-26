@@ -9,6 +9,8 @@ import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import LoadingSpinner from "./loading-spinner";
 import axios from "axios";
+import MobileOtpModal from "./MobileOtpModal";
+
 
 const Editprofile = ({ isopen, onclose }: any) => {
   const { user, updateProfile } = useAuth();
@@ -19,8 +21,13 @@ const Editprofile = ({ isopen, onclose }: any) => {
     location: "Earth",
     website: "example.com",
     avatar: user?.avatar || "",
+     preferredLanguage: user?.preferredLanguage || "en",
   });
   const [error, setError] = useState<any>({});
+
+  const [showMobileOtp, setShowMobileOtp] = useState(false);
+
+
   if (!isopen || !user) return null;
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -52,8 +59,52 @@ const Editprofile = ({ isopen, onclose }: any) => {
     if (!validateForm() || isLoading) return;
 
     setIsLoading(true);
+    
     try {
+
+  if (formData.preferredLanguage === "fr") {
+
+    const res = await axios.post(
+      "http://localhost:5000/send-otp",
+      {
+        email: user.email,
+      }
+    );
+
+    const enteredOtp = prompt(
+      "Enter OTP sent to your email"
+    );
+
+    if (
+      enteredOtp !==
+      res.data.otp.toString()
+    ) {
+      alert("Invalid OTP");
+      setIsLoading(false);
+      return;
+    }
+
+  } else {
+
+  await axios.post(
+    "http://localhost:5000/send-mobile-otp",
+    {
+      phone: user.phone,
+    }
+  );
+
+  setShowMobileOtp(true);
+  setIsLoading(false);
+  return;
+
+}
+ 
+  console.log("BEFORE UPDATE");
+console.log(formData);
+
       await updateProfile(formData);
+
+      console.log("AFTER UPDATE");
       onclose();
     } catch (error) {
       setError({ general: "Failed to update profile. Please try again." });
@@ -77,7 +128,7 @@ const Editprofile = ({ isopen, onclose }: any) => {
     formdataimg.set("image", image);
     try {
       const res = await axios.post(
-        "https://api.imgbb.com/1/upload?key=97f3fb960c3520d6a88d7e29679cf96f",
+        "https://api.imgbb.com/1/upload?key=5733fecc13f812d5aafd2ab4359e29e9",
         formdataimg
       );
       const url = res.data.data.display_url;
@@ -260,6 +311,31 @@ const Editprofile = ({ isopen, onclose }: any) => {
               </div>
 
               {/* Website */}
+
+<div className="space-y-2">
+  <Label className="text-white">
+    Language
+  </Label>
+
+  <select
+    value={formData.preferredLanguage}
+    onChange={(e) =>
+      handleInputChange(
+        "preferredLanguage",
+        e.target.value
+      )
+    }
+    className="w-full bg-black border border-gray-600 text-white p-3 rounded-md"
+  >
+    <option value="en">English</option>
+    <option value="es">Spanish</option>
+    <option value="hi">Hindi</option>
+    <option value="pt">Portuguese</option>
+    <option value="zh">Chinese</option>
+    <option value="fr">French</option>
+  </select>
+</div>
+
               <div className="space-y-2">
                 <Label htmlFor="website" className="text-white">
                   Website
@@ -292,6 +368,17 @@ const Editprofile = ({ isopen, onclose }: any) => {
           </form>
         </CardContent>
       </Card>
+
+<MobileOtpModal
+  isOpen={showMobileOtp}
+  phone={user.phone}
+  onClose={() => setShowMobileOtp(false)}
+  onVerified={async () => {
+    await updateProfile(formData);
+    onclose();
+  }}
+/>
+
     </div>
   );
 };
