@@ -42,6 +42,10 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+/* =========================================================
+   EMAIL OTP STORAGE
+========================================================= */
+
 const emailOtps = new Map();
 
 /* =========================================================
@@ -50,7 +54,15 @@ const emailOtps = new Map();
 
 const app = express();
 
-app.use(cors());
+app.set("trust proxy", 1);
+
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 
 app.use("/uploads", express.static("uploads"));
@@ -107,9 +119,9 @@ function getClientInfo(req) {
     device = "Tablet";
   }
 
-  let browser = result.browser.name || "Unknown";
+  const browser = result.browser.name || "Unknown";
 
-  let operatingSystem =
+  const operatingSystem =
     result.os.name || "Unknown";
 
   let ipAddress =
@@ -138,12 +150,14 @@ app.get("/", (req, res) => {
 });
 
 /* =========================================================
-   EMAIL OTP
+   EMAIL OTP - SEND
 ========================================================= */
 
 app.post("/send-otp", async (req, res) => {
   try {
     const { email } = req.body;
+
+    console.log("SEND OTP REQUEST FOR:", email);
 
     if (!email) {
       return res.status(400).json({
@@ -156,16 +170,24 @@ app.post("/send-otp", async (req, res) => {
       100000 + Math.random() * 900000
     ).toString();
 
+    console.log("LOGIN OTP GENERATED:", otp);
+
+    // IMPORTANT: OTP ni Map lo store cheyyali
+    emailOtps.set(email.toLowerCase(), {
+      otp: otp,
+      expiresAt: Date.now() + 10 * 60 * 1000,
+    });
+
     console.log(
-      "LOGIN OTP GENERATED:",
-      otp
+      "OTP STORED SUCCESSFULLY FOR:",
+      email
     );
 
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: email,
       subject: "Twiller OTP Verification",
-      text: `Your OTP is ${otp}`,
+      text: `Your OTP is ${otp}. It is valid for 10 minutes.`,
     });
 
     console.log(
@@ -175,22 +197,23 @@ app.post("/send-otp", async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      otp: otp,
       message: "OTP sent successfully",
     });
 
   } catch (error) {
-    console.error(
-      "SEND OTP ERROR:",
-      error
-    );
+    console.error("SEND OTP ERROR:", error);
 
     return res.status(500).json({
       success: false,
+      message: "Failed to send OTP",
       error: error.message,
     });
   }
 });
+
+/* =========================================================
+   EMAIL OTP - VERIFY
+========================================================= */
 
 app.post("/verify-email-otp", async (req, res) => {
   try {
@@ -203,46 +226,68 @@ app.post("/verify-email-otp", async (req, res) => {
       });
     }
 
-    const storedOtpData = emailOtps.get(
-      email.toLowerCase()
+    const emailKey = email.toLowerCase();
+
+    const storedOtpData =
+      emailOtps.get(emailKey);
+
+    console.log(
+      "VERIFY OTP FOR:",
+      email
     );
 
     if (!storedOtpData) {
       return res.status(400).json({
         success: false,
-        message: "OTP not found. Please request a new OTP.",
+        message:
+          "OTP not found. Please request a new OTP.",
       });
     }
 
     if (Date.now() > storedOtpData.expiresAt) {
-      emailOtps.delete(email.toLowerCase());
+      emailOtps.delete(emailKey);
 
       return res.status(400).json({
         success: false,
-        message: "OTP expired. Please request a new OTP.",
+        message:
+          "OTP expired. Please request a new OTP.",
       });
     }
 
-    if (storedOtpData.otp !== otp.toString()) {
+    if (
+      storedOtpData.otp !==
+      otp.toString().trim()
+    ) {
       return res.status(400).json({
         success: false,
         message: "Invalid OTP",
       });
     }
 
-    emailOtps.delete(email.toLowerCase());
+    emailOtps.delete(emailKey);
+
+    console.log(
+      "OTP VERIFIED SUCCESSFULLY:",
+      email
+    );
 
     return res.status(200).json({
       success: true,
-      message: "OTP verified successfully",
+      message:
+        "OTP verified successfully",
     });
 
   } catch (error) {
-    console.error("VERIFY EMAIL OTP ERROR:", error);
+    console.error(
+      "VERIFY EMAIL OTP ERROR:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
-      message: "OTP verification failed",
+      message:
+        "OTP verification failed",
+      error: error.message,
     });
   }
 });
@@ -265,24 +310,31 @@ app.post("/send-mobile-otp", async (req, res) => {
     }
 
     await client.verify.v2
-      .services(process.env.TWILIO_VERIFY_SERVICE_SID)
+      .services(
+        process.env.TWILIO_VERIFY_SERVICE_SID
+      )
       .verifications.create({
         to: phone,
         channel: "sms",
       });
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "OTP sent successfully",
     });
-  } catch (error) {
-  console.error("SEND OTP ERROR:", error);
 
-  res.status(500).json({
-    success: false,
-    error: error.message,
-  });
-}
+  } catch (error) {
+    console.error(
+      "MOBILE SEND OTP ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to send mobile OTP",
+      error: error.message,
+    });
+  }
 });
 
 /* =========================================================
@@ -296,7 +348,8 @@ app.post("/verify-mobile-otp", async (req, res) => {
     if (!phone || !otp) {
       return res.status(400).json({
         success: false,
-        message: "Phone and OTP are required",
+        message:
+          "Phone and OTP are required",
       });
     }
 
@@ -310,9 +363,13 @@ app.post("/verify-mobile-otp", async (req, res) => {
           code: otp,
         });
 
-    if (verification.status === "approved") {
+    if (
+      verification.status === "approved"
+    ) {
       return res.status(200).json({
         success: true,
+        message:
+          "Mobile OTP verified successfully",
       });
     }
 
@@ -320,10 +377,14 @@ app.post("/verify-mobile-otp", async (req, res) => {
       success: false,
       message: "Invalid OTP",
     });
-  } catch (error) {
-    console.log("TWILIO VERIFY ERROR:", error);
 
-    res.status(500).json({
+  } catch (error) {
+    console.error(
+      "TWILIO VERIFY ERROR:",
+      error
+    );
+
+    return res.status(500).json({
       success: false,
       error: error.message,
     });
@@ -338,7 +399,8 @@ app.post("/forgot-password", async (req, res) => {
   try {
     const { email, identifier } = req.body;
 
-    const userEmail = email || identifier;
+    const userEmail =
+      email || identifier;
 
     if (!userEmail) {
       return res.status(400).json({
@@ -365,9 +427,12 @@ app.post("/forgot-password", async (req, res) => {
       const today = new Date();
 
       if (
-        lastReset.getDate() === today.getDate() &&
-        lastReset.getMonth() === today.getMonth() &&
-        lastReset.getFullYear() === today.getFullYear()
+        lastReset.getDate() ===
+          today.getDate() &&
+        lastReset.getMonth() ===
+          today.getMonth() &&
+        lastReset.getFullYear() ===
+          today.getFullYear()
       ) {
         return res.status(400).json({
           success: false,
@@ -377,10 +442,12 @@ app.post("/forgot-password", async (req, res) => {
       }
     }
 
-    const newPassword = generatePassword(8);
+    const newPassword =
+      generatePassword(8);
 
     user.password = newPassword;
-    user.lastPasswordReset = new Date();
+    user.lastPasswordReset =
+      new Date();
 
     await user.save();
 
@@ -388,7 +455,8 @@ app.post("/forgot-password", async (req, res) => {
       from: process.env.EMAIL_USER,
       to: userEmail,
       subject: "Twiller Password Reset",
-      text: `Your new password is: ${newPassword}`,
+      text:
+        `Your new password is: ${newPassword}`,
     });
 
     return res.status(200).json({
@@ -396,7 +464,13 @@ app.post("/forgot-password", async (req, res) => {
       message:
         "New password sent to your email",
     });
+
   } catch (error) {
+    console.error(
+      "FORGOT PASSWORD ERROR:",
+      error
+    );
+
     return res.status(500).json({
       success: false,
       error: error.message,
@@ -410,19 +484,26 @@ app.post("/forgot-password", async (req, res) => {
 
 app.post("/register", async (req, res) => {
   try {
-    const existinguser = await User.findOne({
-      email: req.body.email,
-    });
+    const existinguser =
+      await User.findOne({
+        email: req.body.email,
+      });
 
     if (existinguser) {
-      return res.status(200).send(existinguser);
+      return res.status(200).send(
+        existinguser
+      );
     }
 
-    const newUser = new User(req.body);
+    const newUser =
+      new User(req.body);
 
     await newUser.save();
 
-    return res.status(201).send(newUser);
+    return res.status(201).send(
+      newUser
+    );
+
   } catch (error) {
     return res.status(400).send({
       error: error.message,
@@ -455,6 +536,7 @@ app.get("/loggedinuser", async (req, res) => {
     }
 
     return res.status(200).send(user);
+
   } catch (error) {
     return res.status(400).send({
       error: error.message,
@@ -463,19 +545,7 @@ app.get("/loggedinuser", async (req, res) => {
 });
 
 /* =========================================================
-   TASK 6
    SAVE LOGIN HISTORY
-
-   Frontend will call this after successful login.
-
-   Chrome:
-   - OTP required
-
-   Microsoft:
-   - No additional OTP
-
-   Mobile:
-   - Only 10 AM to 1 PM allowed
 ========================================================= */
 
 app.post("/login-history", async (req, res) => {
@@ -500,22 +570,19 @@ app.post("/login-history", async (req, res) => {
       });
     }
 
-    const clientInfo = getClientInfo(req);
+    const clientInfo =
+      getClientInfo(req);
 
-    /* =====================================================
-       MOBILE TIME RESTRICTION
-
-       Allowed:
-       10:00 AM - 1:00 PM
-
-       Only mobile devices are restricted.
-    ===================================================== */
-
-    if (clientInfo.device === "Mobile") {
+    if (
+      clientInfo.device === "Mobile"
+    ) {
       const now = new Date();
 
-      const hour = now.getHours();
-      const minute = now.getMinutes();
+      const hour =
+        now.getHours();
+
+      const minute =
+        now.getMinutes();
 
       const currentMinutes =
         hour * 60 + minute;
@@ -535,48 +602,33 @@ app.post("/login-history", async (req, res) => {
       }
     }
 
-    /* =====================================================
-       SAVE LOGIN HISTORY
-    ===================================================== */
-
     user.loginHistory.push({
-      browser: clientInfo.browser,
+      browser:
+        clientInfo.browser,
 
       operatingSystem:
         clientInfo.operatingSystem,
 
-      device: clientInfo.device,
+      device:
+        clientInfo.device,
 
       ipAddress:
         clientInfo.ipAddress,
 
-      loginTime: new Date(),
+      loginTime:
+        new Date(),
     });
 
     await user.save();
 
     return res.status(200).json({
       success: true,
-
       message:
         "Login history saved successfully",
-
-      loginInfo: {
-        browser: clientInfo.browser,
-
-        operatingSystem:
-          clientInfo.operatingSystem,
-
-        device: clientInfo.device,
-
-        ipAddress:
-          clientInfo.ipAddress,
-
-        loginTime: new Date(),
-      },
     });
+
   } catch (error) {
-    console.log(
+    console.error(
       "LOGIN HISTORY ERROR:",
       error
     );
@@ -603,10 +655,11 @@ app.get("/login-history", async (req, res) => {
       });
     }
 
-    const user = await User.findOne(
-      { email },
-      { loginHistory: 1 }
-    );
+    const user =
+      await User.findOne(
+        { email },
+        { loginHistory: 1 }
+      );
 
     if (!user) {
       return res.status(404).json({
@@ -620,6 +673,7 @@ app.get("/login-history", async (req, res) => {
       loginHistory:
         user.loginHistory || [],
     });
+
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -644,11 +698,14 @@ app.post("/create-order", async (req, res) => {
     };
 
     const order =
-      await razorpay.orders.create(options);
+      await razorpay.orders.create(
+        options
+      );
 
-    res.status(200).json(order);
+    return res.status(200).json(order);
+
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       error: error.message,
     });
   }
@@ -667,11 +724,9 @@ app.patch(
       const updated =
         await User.findOneAndUpdate(
           { email },
-
           {
             $set: req.body,
           },
-
           {
             new: true,
             upsert: false,
@@ -684,13 +739,10 @@ app.patch(
         });
       }
 
-      /* ===================================================
-         SUBSCRIPTION ACTIVATION
-      =================================================== */
-
       if (
         req.body.subscriptionPlan &&
-        req.body.subscriptionPlan !== "Free"
+        req.body.subscriptionPlan !==
+          "Free"
       ) {
         const invoiceNumber =
           "INV-" + Date.now();
@@ -707,7 +759,6 @@ app.patch(
 
         await User.findOneAndUpdate(
           { email },
-
           {
             subscriptionExpiry:
               expiryDate,
@@ -715,7 +766,8 @@ app.patch(
         );
 
         await transporter.sendMail({
-          from: process.env.EMAIL_USER,
+          from:
+            process.env.EMAIL_USER,
 
           to: email,
 
@@ -740,7 +792,10 @@ Thank you for subscribing to Twiller.
         });
       }
 
-      return res.status(200).send(updated);
+      return res.status(200).send(
+        updated
+      );
+
     } catch (error) {
       return res.status(400).send({
         error: error.message,
@@ -761,22 +816,24 @@ app.post(
       if (!req.file) {
         return res.status(400).json({
           success: false,
-          message: "Audio file is required",
+          message:
+            "Audio file is required",
         });
       }
 
-      const port =
-        process.env.PORT || 5000;
+      const baseUrl =
+        `${req.protocol}://${req.get("host")}`;
 
       const audioUrl =
-        `http://localhost:${port}/uploads/${req.file.filename}`;
+        `${baseUrl}/uploads/${req.file.filename}`;
 
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
         audioUrl,
       });
+
     } catch (error) {
-      res.status(400).json({
+      return res.status(400).json({
         error: error.message,
       });
     }
@@ -789,9 +846,10 @@ app.post(
 
 app.post("/post", async (req, res) => {
   try {
-    const user = await User.findById(
-      req.body.author
-    );
+    const user =
+      await User.findById(
+        req.body.author
+      );
 
     if (!user) {
       return res.status(404).send({
@@ -809,7 +867,8 @@ app.post("/post", async (req, res) => {
       });
     }
 
-    const tweet = new Tweet(req.body);
+    const tweet =
+      new Tweet(req.body);
 
     await tweet.save();
 
@@ -817,7 +876,10 @@ app.post("/post", async (req, res) => {
 
     await user.save();
 
-    return res.status(201).send(tweet);
+    return res.status(201).send(
+      tweet
+    );
+
   } catch (error) {
     return res.status(400).send({
       error: error.message,
@@ -833,10 +895,15 @@ app.get("/post", async (req, res) => {
   try {
     const tweet =
       await Tweet.find()
-        .sort({ timestamp: -1 })
+        .sort({
+          timestamp: -1,
+        })
         .populate("author");
 
-    return res.status(200).send(tweet);
+    return res.status(200).send(
+      tweet
+    );
+
   } catch (error) {
     return res.status(400).send({
       error: error.message,
@@ -865,15 +932,22 @@ app.post(
         });
       }
 
-      if (!tweet.likedBy.includes(userId)) {
+      if (
+        !tweet.likedBy.includes(
+          userId
+        )
+      ) {
         tweet.likes += 1;
 
-        tweet.likedBy.push(userId);
+        tweet.likedBy.push(
+          userId
+        );
 
         await tweet.save();
       }
 
-      res.send(tweet);
+      return res.send(tweet);
+
     } catch (error) {
       return res.status(400).send({
         error: error.message,
@@ -910,12 +984,15 @@ app.post(
       ) {
         tweet.retweets += 1;
 
-        tweet.retweetedBy.push(userId);
+        tweet.retweetedBy.push(
+          userId
+        );
 
         await tweet.save();
       }
 
-      res.send(tweet);
+      return res.send(tweet);
+
     } catch (error) {
       return res.status(400).send({
         error: error.message,
@@ -925,7 +1002,7 @@ app.post(
 );
 
 /* =========================================================
-   MONGODB CONNECTION
+   MONGODB CONNECTION + SERVER START
 ========================================================= */
 
 const port =
@@ -936,10 +1013,23 @@ const url =
 
 mongoose
   .connect(url)
-  .then(() => {
+  .then(async () => {
     console.log(
       "✅ Connected to MongoDB"
     );
+
+    try {
+      await transporter.verify();
+
+      console.log(
+        "✅ Gmail transporter is ready"
+      );
+    } catch (error) {
+      console.error(
+        "❌ Gmail transporter error:",
+        error.message
+      );
+    }
 
     app.listen(port, () => {
       console.log(

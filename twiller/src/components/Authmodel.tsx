@@ -14,18 +14,29 @@ import {
 
 import LoadingSpinner from "./loading-spinner";
 import { Button } from "./ui/button";
+
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from "./ui/card";
+
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { Separator } from "./ui/separator";
 
 import { useAuth } from "@/context/AuthContext";
 import TwitterLogo from "./Twitterlogo";
+
+/* =========================================================
+   BACKEND API URL
+
+   Set this in Vercel Environment Variables:
+   NEXT_PUBLIC_API_URL=https://your-backend-url.onrender.com
+========================================================= */
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -73,6 +84,7 @@ export default function AuthModal({
   ========================================================= */
 
   const [signupOtp, setSignupOtp] = useState("");
+
   const [generatedSignupOtp, setGeneratedSignupOtp] =
     useState("");
 
@@ -80,10 +92,11 @@ export default function AuthModal({
     useState(false);
 
   /* =========================================================
-     LOGIN OTP - TASK 6
+     LOGIN OTP
   ========================================================= */
 
   const [loginOtp, setLoginOtp] = useState("");
+
   const [generatedLoginOtp, setGeneratedLoginOtp] =
     useState("");
 
@@ -110,7 +123,6 @@ export default function AuthModal({
   const getBrowser = () => {
     const userAgent = navigator.userAgent;
 
-    // Microsoft Edge
     if (
       userAgent.includes("Edg/") ||
       userAgent.includes("Edge/")
@@ -118,7 +130,6 @@ export default function AuthModal({
       return "Microsoft";
     }
 
-    // Google Chrome
     if (
       userAgent.includes("Chrome/") &&
       !userAgent.includes("Edg/")
@@ -138,16 +149,13 @@ export default function AuthModal({
 
     if (!formData.email.trim()) {
       newErrors.email = "Email is required";
-    } else if (
-      !/\S+@\S+\.\S+/.test(formData.email)
-    ) {
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email =
         "Please enter a valid email";
     }
 
     if (!formData.password.trim()) {
-      newErrors.password =
-        "Password is required";
+      newErrors.password = "Password is required";
     } else if (
       formData.password.length < 6
     ) {
@@ -186,13 +194,11 @@ export default function AuthModal({
 
     setErrors(newErrors);
 
-    return (
-      Object.keys(newErrors).length === 0
-    );
+    return Object.keys(newErrors).length === 0;
   };
 
   /* =========================================================
-     SEND LOGIN OTP - CHROME
+     SEND LOGIN OTP
   ========================================================= */
 
   const sendLoginOtp = async () => {
@@ -201,26 +207,27 @@ export default function AuthModal({
       return;
     }
 
-    if (
-      !/\S+@\S+\.\S+/.test(formData.email)
-    ) {
+    if (!/\S+@\S+\.\S+/.test(formData.email)) {
       alert("Please enter a valid email.");
+      return;
+    }
+
+    if (!API_URL) {
+      alert(
+        "Backend API URL is not configured."
+      );
       return;
     }
 
     try {
       const res = await axios.post(
-        "http://localhost:5000/send-otp",
+        `${API_URL}/send-otp`,
         {
           email: formData.email,
         }
       );
 
       if (res.data.success) {
-        /*
-         * Current backend returns OTP in response.
-         * We store it temporarily only for this login flow.
-         */
         setGeneratedLoginOtp(
           String(res.data.otp)
         );
@@ -229,17 +236,19 @@ export default function AuthModal({
         setLoginOtp("");
 
         alert(
-          "OTP sent successfully to your registered email."
+          "OTP sent successfully to your email."
         );
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(
         "LOGIN OTP ERROR:",
-        error
+        error.response?.data || error.message
       );
 
       alert(
-        "Failed to send OTP. Please try again."
+        error.response?.data?.error ||
+          error.response?.data?.message ||
+          "Failed to send OTP. Please try again."
       );
     }
   };
@@ -254,16 +263,21 @@ export default function AuthModal({
       return;
     }
 
-    if (
-      !/\S+@\S+\.\S+/.test(formData.email)
-    ) {
+    if (!/\S+@\S+\.\S+/.test(formData.email)) {
       alert("Please enter a valid email.");
+      return;
+    }
+
+    if (!API_URL) {
+      alert(
+        "Backend API URL is not configured."
+      );
       return;
     }
 
     try {
       const res = await axios.post(
-        "http://localhost:5000/send-otp",
+        `${API_URL}/send-otp`,
         {
           email: formData.email,
         }
@@ -279,14 +293,16 @@ export default function AuthModal({
 
         alert("OTP sent successfully.");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(
         "SIGNUP OTP ERROR:",
-        error
+        error.response?.data || error.message
       );
 
       alert(
-        "Failed to send OTP."
+        error.response?.data?.error ||
+          error.response?.data?.message ||
+          "Failed to send OTP."
       );
     }
   };
@@ -338,9 +354,15 @@ export default function AuthModal({
   ========================================================= */
 
   const saveLoginHistory = async () => {
+    if (!API_URL) {
+      throw new Error(
+        "Backend API URL is not configured."
+      );
+    }
+
     try {
       const res = await axios.post(
-        "http://localhost:5000/login-history",
+        `${API_URL}/login-history`,
         {
           email: formData.email,
         }
@@ -350,13 +372,9 @@ export default function AuthModal({
     } catch (error: any) {
       console.error(
         "LOGIN HISTORY ERROR:",
-        error
+        error.response?.data || error.message
       );
 
-      /*
-       * Backend returns 403 when mobile login
-       * happens outside 10 AM - 1 PM.
-       */
       if (
         error.response?.status === 403
       ) {
@@ -369,6 +387,102 @@ export default function AuthModal({
       throw new Error(
         error.response?.data?.message ||
           "Unable to save login history."
+      );
+    }
+  };
+
+  /* =========================================================
+     SEND MOBILE OTP
+  ========================================================= */
+
+  const sendMobileOtp = async () => {
+    if (!recoveryPhone.trim()) {
+      alert(
+        "Please enter mobile number."
+      );
+      return;
+    }
+
+    if (!API_URL) {
+      alert(
+        "Backend API URL is not configured."
+      );
+      return;
+    }
+
+    try {
+      const res = await axios.post(
+        `${API_URL}/send-mobile-otp`,
+        {
+          phone: recoveryPhone,
+        }
+      );
+
+      if (res.data.success) {
+        alert(
+          "Mobile OTP sent successfully."
+        );
+      }
+    } catch (error: any) {
+      console.error(
+        "MOBILE OTP ERROR:",
+        error.response?.data || error.message
+      );
+
+      alert(
+        error.response?.data?.error ||
+          error.response?.data?.message ||
+          "Failed to send mobile OTP."
+      );
+    }
+  };
+
+  /* =========================================================
+     VERIFY MOBILE OTP
+  ========================================================= */
+
+  const verifyMobileOtp = async () => {
+    if (
+      !recoveryPhone.trim() ||
+      !recoveryOtp.trim()
+    ) {
+      alert(
+        "Enter phone number and OTP."
+      );
+      return;
+    }
+
+    if (!API_URL) {
+      alert(
+        "Backend API URL is not configured."
+      );
+      return;
+    }
+
+    try {
+      const res = await axios.post(
+        `${API_URL}/verify-mobile-otp`,
+        {
+          phone: recoveryPhone,
+          otp: recoveryOtp,
+        }
+      );
+
+      if (res.data.success) {
+        alert(
+          "Mobile OTP verified successfully."
+        );
+      }
+    } catch (error: any) {
+      console.error(
+        "VERIFY MOBILE OTP ERROR:",
+        error.response?.data || error.message
+      );
+
+      alert(
+        error.response?.data?.error ||
+          error.response?.data?.message ||
+          "Invalid OTP."
       );
     }
   };
@@ -390,9 +504,7 @@ export default function AuthModal({
     }
 
     try {
-      /* =====================================================
-         SIGNUP
-      ===================================================== */
+      /* SIGNUP */
 
       if (mode === "signup") {
         if (!signupOtpSent) {
@@ -420,13 +532,10 @@ export default function AuthModal({
 
         resetForm();
         onClose();
-
         return;
       }
 
-      /* =====================================================
-         LOGIN - TASK 6
-      ===================================================== */
+      /* LOGIN */
 
       const browser = getBrowser();
 
@@ -435,10 +544,7 @@ export default function AuthModal({
         browser
       );
 
-      /* =====================================================
-         CHROME
-         OTP REQUIRED
-      ===================================================== */
+      /* CHROME OTP */
 
       if (browser === "Chrome") {
         if (!loginOtpSent) {
@@ -453,49 +559,18 @@ export default function AuthModal({
         }
       }
 
-      /* =====================================================
-         MICROSOFT EDGE
-         NO OTP REQUIRED
-      ===================================================== */
-
-      if (browser === "Microsoft") {
-        console.log(
-          "Microsoft browser detected - OTP not required."
-        );
-      }
-
-      /* =====================================================
-         OTHER BROWSERS
-         NO EXTRA OTP
-      ===================================================== */
-
-      if (browser === "Other") {
-        console.log(
-          "Other browser detected."
-        );
-      }
-
-      /* =====================================================
-         FIREBASE LOGIN
-      ===================================================== */
+      /* FIREBASE LOGIN */
 
       await login(
         formData.email,
         formData.password
       );
 
-      /* =====================================================
-         LOGIN HISTORY
-         Browser / OS / Device / IP
-      ===================================================== */
+      /* SAVE LOGIN HISTORY */
 
       try {
         await saveLoginHistory();
       } catch (historyError: any) {
-        /*
-         * If backend rejects login because of
-         * mobile time restriction, logout immediately.
-         */
         try {
           await logout();
         } catch (logoutError) {
@@ -512,10 +587,6 @@ export default function AuthModal({
 
         return;
       }
-
-      /* =====================================================
-         LOGIN SUCCESS
-      ===================================================== */
 
       alert("Login successful.");
 
@@ -587,7 +658,7 @@ export default function AuthModal({
   };
 
   /* =========================================================
-     SWITCH LOGIN / SIGNUP
+     SWITCH MODE
   ========================================================= */
 
   const switchMode = () => {
@@ -601,7 +672,7 @@ export default function AuthModal({
   };
 
   /* =========================================================
-     CLOSE MODAL
+     CLOSE
   ========================================================= */
 
   const handleClose = () => {
@@ -619,11 +690,8 @@ export default function AuthModal({
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-md bg-black border-gray-800 text-white">
 
-        {/* ===================================================
-            HEADER
-        =================================================== */}
+      <Card className="w-full max-w-md bg-black border-gray-800 text-white">
 
         <CardHeader className="relative pb-6">
 
@@ -652,13 +720,10 @@ export default function AuthModal({
             </CardTitle>
 
           </div>
+
         </CardHeader>
 
         <CardContent className="space-y-6">
-
-          {/* =================================================
-              GENERAL ERROR
-          ================================================= */}
 
           {errors.general && (
             <div className="bg-red-900/20 border border-red-800 rounded-lg p-3 text-red-400 text-sm">
@@ -666,23 +731,13 @@ export default function AuthModal({
             </div>
           )}
 
-          {/* =================================================
-              FORM
-          ================================================= */}
-
           <form
             onSubmit={handleSubmit}
             className="space-y-4"
           >
 
-            {/* ===============================================
-                SIGNUP FIELDS
-            =============================================== */}
-
             {mode === "signup" && (
               <>
-                {/* DISPLAY NAME */}
-
                 <div className="space-y-2">
 
                   <Label
@@ -694,7 +749,7 @@ export default function AuthModal({
 
                   <div className="relative">
 
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
 
                     <Input
                       id="displayName"
@@ -709,7 +764,7 @@ export default function AuthModal({
                           e.target.value
                         )
                       }
-                      className="pl-10 bg-transparent border-gray-600 text-white placeholder-gray-400 focus:border-blue-500"
+                      className="pl-10 bg-transparent border-gray-600 text-white"
                       disabled={isLoading}
                     />
 
@@ -722,8 +777,6 @@ export default function AuthModal({
                   )}
 
                 </div>
-
-                {/* PHONE */}
 
                 <div className="space-y-2">
 
@@ -757,8 +810,6 @@ export default function AuthModal({
 
                 </div>
 
-                {/* USERNAME */}
-
                 <div className="space-y-2">
 
                   <Label
@@ -770,7 +821,7 @@ export default function AuthModal({
 
                   <div className="relative">
 
-                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                       @
                     </span>
 
@@ -785,7 +836,7 @@ export default function AuthModal({
                           e.target.value
                         )
                       }
-                      className="pl-8 bg-transparent border-gray-600 text-white placeholder-gray-400 focus:border-blue-500"
+                      className="pl-8 bg-transparent border-gray-600 text-white"
                       disabled={isLoading}
                     />
 
@@ -801,10 +852,6 @@ export default function AuthModal({
               </>
             )}
 
-            {/* ===============================================
-                EMAIL
-            =============================================== */}
-
             <div className="space-y-2">
 
               <Label
@@ -816,7 +863,7 @@ export default function AuthModal({
 
               <div className="relative">
 
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
 
                 <Input
                   id="email"
@@ -829,7 +876,7 @@ export default function AuthModal({
                       e.target.value
                     )
                   }
-                  className="pl-10 bg-transparent border-gray-600 text-white placeholder-gray-400 focus:border-blue-500"
+                  className="pl-10 bg-transparent border-gray-600 text-white"
                   disabled={isLoading}
                 />
 
@@ -842,10 +889,6 @@ export default function AuthModal({
               )}
 
             </div>
-
-            {/* ===============================================
-                SIGNUP OTP
-            =============================================== */}
 
             {mode === "signup" && (
               <>
@@ -894,10 +937,6 @@ export default function AuthModal({
               </>
             )}
 
-            {/* ===============================================
-                LOGIN OTP - ONLY CHROME
-            =============================================== */}
-
             {mode === "login" && (
               <div className="space-y-3">
 
@@ -905,10 +944,9 @@ export default function AuthModal({
                   <strong>
                     Task 6 Security:
                   </strong>{" "}
-                  Chrome users must verify
-                  their email using OTP.
-                  Microsoft Edge users can
-                  login without OTP.
+                  Chrome users must verify their
+                  email using OTP. Microsoft Edge
+                  users can login without OTP.
                 </div>
 
                 <Button
@@ -962,10 +1000,6 @@ export default function AuthModal({
               </div>
             )}
 
-            {/* ===============================================
-                PASSWORD
-            =============================================== */}
-
             <div className="space-y-2">
 
               <Label
@@ -977,7 +1011,7 @@ export default function AuthModal({
 
               <div className="relative">
 
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
 
                 <Input
                   id="password"
@@ -994,7 +1028,7 @@ export default function AuthModal({
                       e.target.value
                     )
                   }
-                  className="pl-10 pr-10 bg-transparent border-gray-600 text-white placeholder-gray-400 focus:border-blue-500"
+                  className="pl-10 pr-10 bg-transparent border-gray-600 text-white"
                   disabled={isLoading}
                 />
 
@@ -1002,7 +1036,7 @@ export default function AuthModal({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="absolute right-1 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
                   onClick={() =>
                     setShowPassword(
                       !showPassword
@@ -1026,10 +1060,6 @@ export default function AuthModal({
 
             </div>
 
-            {/* ===============================================
-                SUBMIT
-            =============================================== */}
-
             <Button
               type="submit"
               className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 rounded-full text-lg"
@@ -1037,15 +1067,12 @@ export default function AuthModal({
             >
               {isLoading ? (
                 <div className="flex items-center space-x-2">
-
                   <LoadingSpinner size="sm" />
-
                   <span>
                     {mode === "login"
                       ? "Signing in..."
                       : "Creating account..."}
                   </span>
-
                 </div>
               ) : (
                 mode === "login"
@@ -1056,23 +1083,12 @@ export default function AuthModal({
 
           </form>
 
-          {/* =================================================
-              OR
-          ================================================= */}
-
           <div className="relative">
-
             <Separator className="bg-gray-700" />
-
-            <span className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-black px-2 text-gray-400 text-sm">
+            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-black px-2 text-gray-400 text-sm">
               OR
             </span>
-
           </div>
-
-          {/* =================================================
-              FORGOT PASSWORD
-          ================================================= */}
 
           {mode === "login" && (
             <div className="text-right">
@@ -1092,8 +1108,6 @@ export default function AuthModal({
               {showRecoveryOptions && (
                 <div className="mt-3 space-y-3">
 
-                  {/* MOBILE NUMBER */}
-
                   <Input
                     type="text"
                     placeholder="Enter Mobile Number"
@@ -1106,48 +1120,13 @@ export default function AuthModal({
                     className="bg-transparent border-gray-600 text-white"
                   />
 
-                  {/* SEND MOBILE OTP */}
-
                   <Button
                     type="button"
                     className="w-full bg-green-600 hover:bg-green-700"
-                    onClick={async () => {
-                      if (
-                        !recoveryPhone.trim()
-                      ) {
-                        alert(
-                          "Please enter mobile number."
-                        );
-                        return;
-                      }
-
-                      try {
-                        await axios.post(
-                          "http://localhost:5000/send-mobile-otp",
-                          {
-                            phone:
-                              recoveryPhone,
-                          }
-                        );
-
-                        alert(
-                          "OTP sent successfully."
-                        );
-                      } catch (error) {
-                        console.error(
-                          error
-                        );
-
-                        alert(
-                          "Failed to send mobile OTP."
-                        );
-                      }
-                    }}
+                    onClick={sendMobileOtp}
                   >
                     Send Mobile OTP
                   </Button>
-
-                  {/* MOBILE OTP */}
 
                   <Input
                     type="text"
@@ -1166,56 +1145,13 @@ export default function AuthModal({
                     className="bg-transparent border-gray-600 text-white"
                   />
 
-                  {/* VERIFY MOBILE OTP */}
-
                   <Button
                     type="button"
                     className="w-full bg-blue-600 hover:bg-blue-700"
-                    onClick={async () => {
-                      if (
-                        !recoveryPhone ||
-                        !recoveryOtp
-                      ) {
-                        alert(
-                          "Enter phone number and OTP."
-                        );
-                        return;
-                      }
-
-                      try {
-                        const res =
-                          await axios.post(
-                            "http://localhost:5000/verify-mobile-otp",
-                            {
-                              phone:
-                                recoveryPhone,
-                              otp:
-                                recoveryOtp,
-                            }
-                          );
-
-                        if (
-                          res.data.success
-                        ) {
-                          alert(
-                            "Mobile OTP verified successfully."
-                          );
-                        }
-                      } catch (error) {
-                        console.error(
-                          error
-                        );
-
-                        alert(
-                          "Invalid OTP."
-                        );
-                      }
-                    }}
+                    onClick={verifyMobileOtp}
                   >
                     Verify Mobile OTP
                   </Button>
-
-                  {/* EMAIL PASSWORD RESET */}
 
                   <Button
                     type="button"
@@ -1244,56 +1180,21 @@ export default function AuthModal({
                     Generate Random Password (Email)
                   </Button>
 
-                  <Button
-                    type="button"
-                    className="w-full bg-black border border-gray-600 text-white hover:bg-gray-800"
-                    onClick={async () => {
-                      if (
-                        !formData.email
-                      ) {
-                        alert(
-                          "Please enter your email."
-                        );
-                        return;
-                      }
-
-                      try {
-                        await forgotPassword(
-                          formData.email
-                        );
-
-                        alert(
-                          "Password reset request processed."
-                        );
-                      } catch (error) {
-                        alert(
-                          "Password reset failed."
-                        );
-                      }
-                    }}
-                  >
-                    Send Reset Link (Email)
-                  </Button>
-
                 </div>
               )}
 
             </div>
           )}
 
-          {/* =================================================
-              SWITCH LOGIN / SIGNUP
-          ================================================= */}
-
           <div className="text-center">
 
             <p className="text-gray-400">
-
               {mode === "login"
                 ? "Don't have an account?"
                 : "Already have an account?"}
 
               <Button
+                type="button"
                 variant="link"
                 className="text-blue-400 hover:text-blue-300 font-semibold pl-1"
                 onClick={switchMode}
@@ -1308,10 +1209,6 @@ export default function AuthModal({
 
           </div>
 
-          {/* =================================================
-              TERMS
-          ================================================= */}
-
           {mode === "signup" && (
             <div className="text-center text-xs text-gray-400">
               By signing up, you agree to our
@@ -1321,7 +1218,9 @@ export default function AuthModal({
           )}
 
         </CardContent>
+
       </Card>
+
     </div>
   );
 }
