@@ -1,9 +1,10 @@
 import axios from "axios";
 
 const axiosInstance = axios.create({
-  baseURL: "http://localhost:5000",
+  baseURL: "https://twiller-2-0-yjv4.onrender.com",
   headers: {
     "Content-Type": "application/json",
   },
 });
+
 export default axiosInstance;
